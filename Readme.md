@@ -1,7 +1,7 @@
 # Pulse Giver
 
 > **Note**
-> If you want to copy/paste the code into Arduino, go here: /src/main.cpp
+> If you want to copy/paste the code into Arduino, go [here](/src/main.cpp)
 
 This code uses: https://github.com/rjbatista/tm1638-library
 
