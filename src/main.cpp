@@ -5,6 +5,7 @@ bool debug = false;
 
 const int OUTPUT_PIN = 6; 
 const int LED_PIN = LED_BUILTIN; 
+const int EXT_Trigger = 7;
 
 const int STB = 8;
 const int CLK = 9;
@@ -152,16 +153,25 @@ void setDispHelper(unsigned long *value, byte pos1, byte pos2) {
   
 }
 
+void setcount(int count) {
+    if(count == 100) {
+      modul.setDisplayDigit(0,0,1); 
+    } else {
+      byte pos1 = (count / 10) % 10; 
+      byte pos2 = count % 10; 
+
+      modul.setDisplayDigit(pos1, 0, 0);
+      modul.setDisplayDigit(pos2, 1, 0); 
+
+}
+
 void setDisp() {
   // Count 
-  if(count == 100) {
-    modul.setDisplayDigit(0,0,1); 
+  if(pulses_to_go > 0) {
+    setcount(pulses_to_go);
   } else {
-    byte pos1 = (count / 10) % 10; 
-    byte pos2 = count % 10; 
-
-    modul.setDisplayDigit(pos1, 0, 0);
-    modul.setDisplayDigit(pos2, 1, 0); 
+      setcount(count);
+    }
   }
 
   //Off
@@ -192,7 +202,7 @@ int threshhold = 40;
 int fast = 10; 
 
 
-void updatePressDur(byte b) {
+void updatePressDur(byte b) {  //Determines how long a button has been pushed down for 
   for(int i = 0; i < 8; i ++) {
     if(getBit(b, i) == 0) {
       press_dur[i] = 0;
@@ -204,11 +214,72 @@ void updatePressDur(byte b) {
 
 
 
+void send_pulses() {
+  if(off_duration_ms < 100 & on_duration_ms < 100) {
+    send_pulses_short(); 
+  } else {
+    pulses_to_go = count; 
+  }
+}
+
+void send_pulses_short() {
+      
+    modul.setLEDs(255); 
+    for(int i = 0; i < count; i ++) { 
+      delay(off_duration_ms); 
+      digitalWrite(OUTPUT_PIN, HIGH); 
+      digitalWrite(LED_PIN, HIGH); 
+      delay(on_duration_ms); 
+      digitalWrite(LED_PIN, LOW);
+      digitalWrite(OUTPUT_PIN, LOW); 
+
+    }
+    modul.setLEDs(0); 
+
+}
+
+bool is_on = false; 
+int pulses_to_go = 0; 
+unsigned long target_time = 0; 
+int last_loop_time = 0; 
+
+void pulse_handler() {
+  if(pulses_to_go == 0) return; 
+  
+  last_loop_time = last_loop_time - millis(); 
+
+  unsigned long time_to_go = target_time - millis(); 
+
+
+  if(time_to_go < (last_loop_time + 5)) {
+    while(target_time < millis()) {
+      delayMicroseconds(10); 
+    }
+    is_on != is_on; 
+    digitalWrite(OUTPUT_PIN, is_on); 
+    digitalWrite(LED_PIN, is_on); 
+
+    if(is_on) {
+      target_time = millis() + on_duration_ms; 
+    } else {
+      target_time = millis() + off_duration_ms; 
+      pulses_to_go --; 
+    }
+
+  }
+
+  last_loop_time = millis(); 
+
+}
+
+
+
 void setup(){
   //bleibt leer
 
   pinMode(LED_PIN, OUTPUT);
   pinMode(OUTPUT_PIN, OUTPUT); 
+  pinMode(EXT_Trigger, INPUT); 
 
 
   if(debug) Serial.begin(9600); 
@@ -218,6 +289,8 @@ void loop(){
   iterations ++; 
 
   loop_dur_ms = millis(); 
+
+  bool trigger_pressed = digitalRead(EXT_Trigger);
 
 
 
@@ -258,18 +331,8 @@ void loop(){
       smart_increase(&off_duration_ms);
     }
   }
-  if(getBit(button,5)) {
-    modul.setLEDs(255); 
-    for(int i = 0; i < count; i ++) { 
-      delay(off_duration_ms); 
-      digitalWrite(OUTPUT_PIN, HIGH); 
-      digitalWrite(LED_PIN, HIGH); 
-      delay(on_duration_ms); 
-      digitalWrite(LED_PIN, LOW);
-      digitalWrite(OUTPUT_PIN, LOW); 
-
-    }
-    modul.setLEDs(0); 
+  if(getBit(button,5) || trigger_pressed) {
+      send_pulses();
   } 
   if(getBit(button, 6)) {
 
@@ -288,6 +351,8 @@ void loop(){
   }
 
   setDisp(); 
+
+  pulse_handler();
 
   delay(1); 
 
